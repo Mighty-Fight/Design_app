@@ -29,8 +29,19 @@
         app:layout_constraintStart_toStartOf="parent"
         android:text="Enviar Datos"/>
 
-
-
+    <!-- EditText para mostrar la respuesta del dispositivo ELM327 -->
+    <EditText
+        android:id="@+id/etResponse"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:hint="Respuesta del ELM327"
+        android:gravity="center"
+        android:editable="false"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/miboton" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
+
 
