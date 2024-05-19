@@ -14,6 +14,8 @@ import android.os.AsyncTask
 import android.os.Bundle
 import android.os.Handler
 import android.util.Log
+import android.view.View
+import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -29,13 +31,29 @@ import java.util.UUID
 class DesignAppActivity : AppCompatActivity() {
 
     private val PERMISSION_REQUEST_CODE = 123
-    private val UDP_INTERVAL_MS = 1000L // 1 seconds
-    private var rpm2: Int? = null
+    private val UDP_INTERVAL_MS = 2000L // 2 seconds
+    private var rpm: Int? = null
+    private var batteryStatus: String? = null
+    private var isRpmQuery = true
     private val udpHandler = Handler()
+    private val queryHandler = Handler()
+
     private val udpRunnable = object : Runnable {
         override fun run() {
             SendUDPTask(this@DesignAppActivity).execute()
             udpHandler.postDelayed(this, UDP_INTERVAL_MS)
+        }
+    }
+
+    private val queryRunnable = object : Runnable {
+        override fun run() {
+            if (isRpmQuery) {
+                queryEngineRPM()
+            } else {
+                queryBatteryStatus()
+            }
+            isRpmQuery = !isRpmQuery
+            queryHandler.postDelayed(this, UDP_INTERVAL_MS / 2)
         }
     }
 
@@ -45,18 +63,40 @@ class DesignAppActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_desing_app)
 
+        // Buscar el botón por su ID
+        val startButton: Button = findViewById(R.id.miboton)
+
+        // Establecer un Listener de clic para el botón
+        startButton.setOnClickListener {
+
+            if (!checkLocationPermission()) {
+                requestLocationPermission()
+                return@setOnClickListener
+            }
+            // Colocar aquí el código para establecer la conexión Bluetooth y comenzar el envío periódico de paquetes UDP
+            val macAddress = "00:10:CC:4F:36:03" // Reemplaza con la dirección MAC del adaptador ELM327
+            ConnectBluetoothTask().execute(macAddress)
+        }
+
         if (!checkLocationPermission()) {
             requestLocationPermission()
         }
+    }
 
-        val macAddress = "00:10:CC:4F:36:03" // Reemplaza con la dirección MAC del adaptador ELM327
-        bluetoothSocket = connectToBluetoothDevice(macAddress)
+    override fun onDestroy() {
+        super.onDestroy()
+        udpHandler.removeCallbacks(udpRunnable)
+        queryHandler.removeCallbacks(queryRunnable)
+    }
 
-        if (bluetoothSocket != null) {
-            // Iniciar el envío periódico de paquetes UDP y obtener las RPM del motor cada 5 segundos
-            udpHandler.postDelayed(udpRunnable, UDP_INTERVAL_MS)
-        } else {
-            showToast("Error al conectar con el adaptador Bluetooth")
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Permiso concedido, puedes proceder
+            } else {
+                showToast("Permiso de ubicación denegado")
+            }
         }
     }
 
@@ -68,14 +108,11 @@ class DesignAppActivity : AppCompatActivity() {
             // Get GPS coordinates
             val gpsInfo = getGPSInfo()
 
-            // Get engine RPM
-            val rpm = getEngineRPM()
-
             // Construct the message
-            val formattedMessage = "${gpsInfo?.latitude} ${gpsInfo?.longitude} ${getCurrentDate()} ${getCurrentTime()} $rpm2"
+            val formattedMessage = "${gpsInfo?.latitude} ${gpsInfo?.longitude} ${getCurrentDate()} ${getCurrentTime()} $rpm $batteryStatus"
 
             // List of target IP addresses
-            val ipAddresses = listOf("3.95.161.144","10.20.38.150", "3.138.188.227", "18.119.122.93", "3.147.28.230")
+            val ipAddresses = listOf("3.95.161.144", "10.20.38.150", "3.138.188.227", "18.119.122.93", "3.147.28.230")
 
             return try {
                 val socket = DatagramSocket()
@@ -111,39 +148,6 @@ class DesignAppActivity : AppCompatActivity() {
             val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
             return timeFormat.format(Date())
         }
-
-        private fun getEngineRPM(): Int {
-            val response = sendATCommand("010C") // Send AT command to get engine RPM
-            // Obtener los valores directamente utilizando el método substring()
-            // Separar la cadena de respuesta en partes usando el espacio como delimitador
-            val parts = response?.split(" ")
-
-            // Obtener los valores que te interesan (el tercer y cuarto elementos en la lista)
-            val valor1 = parts?.getOrNull(2)
-            val valor2 = parts?.getOrNull(3)
-            val yy = valor1?.toInt(16)
-            val xx = valor2?.toInt(16)
-            if (yy != null && xx != null) {
-                // Aplicar la fórmula
-                val rpm1 = (yy * 256 + xx) / 4
-                rpm2 = rpm1
-            }
-            println("El resultado es: $rpm2")
-            // Imprimir los valores
-            println("Valor 1: $valor1")
-            println("Valor 2: $valor2")
-            println("RPM: $response")
-
-            return 0  // You need to return the engine RPM as an integer
-        }
-
-        override fun onPostExecute(result: Boolean) {
-            if (result) {
-                showToast("Paquetes UDP enviados correctamente")
-            } else {
-                showToast("Error al enviar los paquetes UDP")
-            }
-        }
     }
 
     private fun showToast(message: String) {
@@ -171,6 +175,25 @@ class DesignAppActivity : AppCompatActivity() {
         )
     }
 
+    private inner class ConnectBluetoothTask : AsyncTask<String, Void, BluetoothSocket?>() {
+
+        override fun doInBackground(vararg params: String?): BluetoothSocket? {
+            val macAddress = params[0] ?: return null
+            return connectToBluetoothDevice(macAddress)
+        }
+
+        override fun onPostExecute(socket: BluetoothSocket?) {
+            bluetoothSocket = socket
+            if (bluetoothSocket != null) {
+                // Iniciar el envío periódico de paquetes UDP y la consulta de RPM y estado de batería
+                queryHandler.postDelayed(queryRunnable, UDP_INTERVAL_MS / 2)
+                udpHandler.postDelayed(udpRunnable, UDP_INTERVAL_MS)
+            } else {
+                showToast("Error al conectar con el adaptador Bluetooth")
+            }
+        }
+    }
+
     private fun connectToBluetoothDevice(macAddress: String): BluetoothSocket? {
         val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
         val device: BluetoothDevice? = bluetoothAdapter.getRemoteDevice(macAddress)
@@ -194,7 +217,6 @@ class DesignAppActivity : AppCompatActivity() {
         }
     }
 
-
     private fun sendATCommand(command: String): String? {
         val outputStream = bluetoothSocket?.outputStream
         val inputStream = bluetoothSocket?.inputStream
@@ -205,10 +227,28 @@ class DesignAppActivity : AppCompatActivity() {
             outputStream?.flush() // Flush the output stream
             val buffer = ByteArray(1024)
             inputStream?.read(buffer)
-            String(buffer)
+            String(buffer).trim()
         } catch (e: IOException) {
             e.printStackTrace()
             null
         }
+    }
+
+    private fun queryEngineRPM() {
+        val response = sendATCommand("010C") // Send AT command to get engine RPM
+        val parts = response?.split(" ")
+
+        val valor1 = parts?.getOrNull(2)
+        val valor2 = parts?.getOrNull(3)
+        val yy = valor1?.toInt(16)
+        val xx = valor2?.toInt(16)
+        if (yy != null && xx != null) {
+            rpm = (yy * 256 + xx) / 4
+        }
+    }
+
+    private fun queryBatteryStatus() {
+        val response = sendATCommand("ATRV") // Send AT command to get battery status
+        batteryStatus = response // The response should directly provide the battery voltage in a readable format
     }
 }

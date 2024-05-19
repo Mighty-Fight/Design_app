@@ -5,42 +5,46 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:layout_gravity="center"
     tools:context=".DesignAppActivity">
 
-    <TextView
-        android:id="@+id/texto"
+
+
+    <ImageView
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textSize="50sp"
-        android:textAlignment="center"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
+        android:layout_height="225dp"
+        android:src="@drawable/logo_zizu"
         app:layout_constraintTop_toTopOf="parent"
-        tools:ignore="MissingConstraints"
-        android:text="Bienvendidos al himalaya"/>
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@+id/miboton"
+        />
 
     <Button
         android:id="@+id/miboton"
         android:layout_width="150dp"
         android:layout_height="80dp"
-        app:layout_constraintTop_toBottomOf="@id/texto"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        android:text="Enviar Datos"/>
-
-    <!-- EditText para mostrar la respuesta del dispositivo ELM327 -->
-    <EditText
-        android:id="@+id/etResponse"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:hint="Respuesta del ELM327"
         android:gravity="center"
-        android:editable="false"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/miboton" />
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:text="Iniciar_App"/>
+
+    <EditText
+        android:id="@+id/derechos_reservados"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Derechos reservados 2024\nUniversidad del Norte\nDepartamento de Ingenierías"
+        android:textAlignment="center"
+        android:textSize="12sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginBottom="20dp"
+        />
+
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>
 
